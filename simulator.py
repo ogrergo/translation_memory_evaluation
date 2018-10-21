@@ -4,123 +4,124 @@ from tqdm import tqdm
 import os
 import shutil
 
-class Simulator:
-    def __init__(self, root, backend, operator, multimatcher, dataset_init, dataset_test):
-        self.root = root
-        self.name = "backend.{}_operator.{}_multimatch.{}_initialization.{}_testset.{}_direction.{}" \
-                .format(backend.__name__,
-                        operator.__name__,
-                        multimatcher.__name__,
-                        dataset_init.name,
-                        dataset_test.name,
-                        dataset_test.direction)
 
-        self.folder = os.path.join(self.root, self.name)
+
+class Simulator:
+    def __init__(self, exp_path, backend, multimatcher, dataset_init, dataset_test):
+        self.folder = exp_path
+        self.name = os.path.basename(exp_path)
+
         if os.path.exists(self.folder):
             shutil.rmtree(self.folder)
         os.makedirs(self.folder)
 
-        self.backend = backend({'folder': self.folder})
-        self.operator = operator()
+        self.backend = backend
         self.multimatcher = multimatcher
         self.dataset_init = dataset_init
         self.dataset_test = dataset_test
 
     def run(self):
-        self.backend.load(self.dataset_init, self.operator)
+        self.backend.load(self.dataset_init)
 
         matchs = self._pass_test_set()
 
-        scores = self.compute_score(matchs)
-
-        self.save_simulation(matchs, scores)
+        self.save_simulation(matchs)
 
     def _pass_test_set(self):
         matchs = []
-        for i, (test_src, test_tgt, direction) in enumerate(tqdm(self.dataset_test, 'Running simulation')):
-            test_src_pre, test_src_map = self.operator.preprocess(test_src, lang=direction[:2])
+        for test_src, test_tgt in tqdm(self.dataset_test.iter_operators(), 'Running simulation {} :'.format(self.name)):
+            matched_many = self.backend.find(test_src)
+            self.backend.add(test_src, test_tgt)
 
-            matched_many_pre = self.backend.find(test_src_pre, lang=direction[:2])
-            if not matched_many_pre:
-                matchs.append((direction, test_src, test_src_pre, test_src_map, test_tgt))
+            direction = "{}2{}".format(test_src.language, test_tgt.language)
+
+            if not matched_many:
+                matchs.append((test_src, test_tgt, direction))
                 continue
 
-            matched_many_post = [self.operator.postprocess(*e, lang=direction[3:], mapping_tgt=test_src_map)
-                                 for e in matched_many_pre]
+            matched_many_post = [e.render_translation(test_src) for e in matched_many]
+            
+            idx = self.multimatcher(matched_many_post, test_tgt.source)
 
-            idx = self.multimatcher(matched_many_post, test_tgt)
-
-            self.backend.add(test_src_pre, test_src_map,
-                             *self.operator.preprocess(test_tgt, lang=direction[3:]),
-                             direction, i)
-
-            matchs.append((direction, test_src, test_src_pre, test_src_map, test_tgt,
-                           len(matched_many_post), matched_many_post[idx], *matched_many_pre[idx]))
+            matchs.append((test_src, test_tgt, direction, len(matched_many), matched_many[idx], matched_many_post[idx]))
 
         return matchs
 
-    def compute_score(self, matchs):
-        bleu_oracle = []
+    def compute_scores(self, matchs):
         bleu_matched = []
-        for match in tqdm(matchs, 'Computing TM scores'):
-            if len(match) > 5:
-                direction, test_src, test_src_pre, test_src_map, test_tgt, nb_matched, \
-                match_post, match_pre, match_pre_map = match
+        nb_matched_all = []
 
-                bleu_matched.append(utils.bleu([test_tgt], [match_post]))
+        for match in matchs:
+            if len(match) > 3:
+                test_src, test_tgt, direction, nb_matched, matched, matched_rendered = match
+
+                bleu_matched.append(utils.bleu([test_tgt.source], [matched_rendered]))
+                nb_matched_all.append(nb_matched)
 
         total = len(matchs)
-        multi_matched = sum(1 if len(e) > 5 and e[5] > 1 else 0 for e in matchs)
-        _matched = [len(e) > 5 for e in matchs]
+        multi_matched = sum(1 if len(e) > 3 and e[3] > 1 else 0 for e in matchs)
+        _matched = [len(e) > 3 for e in matchs]
 
         return {
             'bleu_total': sum(bleu_matched) / total,
             'bleu_matched': sum(bleu_matched) / len(bleu_matched),
 
-            'nb_matched': sum(_matched),
-            'ratio_matched': sum(_matched) / total,
+            'nb_entry_matched': sum(_matched),
+            'avg_nb_entry_matched': sum(_matched) / total,
 
-            'nb_multi_matched': multi_matched,
-            'ratio_multimatched': multi_matched / total,
+            'nb_entry_multi_matched': multi_matched,
+            'avg_nb_entry_multi_matched': multi_matched / total,
+
+            'nb_database_match': sum(nb_matched_all),
+            'avg-matched_nb_database_match': sum(nb_matched_all) / sum(_matched),
 
             'nb_no_matched': sum(1 if not e else 0 for e in _matched),
-            'ratio_no_matched': sum(1 if not e else 0 for e in _matched) / total,
+            'avg_no_matched': sum(1 if not e else 0 for e in _matched) / total,
+
+            'nb_bleu_1': sum(1 if d == 1.0 else 0 for d in bleu_matched),
+            'avg-matched_nb_bleu_1':  sum(1 if d == 1.0 else 0 for d in bleu_matched) / sum(_matched),
+
+            'nb_bleu_between_1_0.7': sum(1 if d < 1.0 and d > 0.7 else 0 for d in bleu_matched),
+            'avg-matched_nb_bleu_between_1_0.7': sum(1 if d < 1.0 and d > 0.7 else 0 for d in bleu_matched) / sum(_matched),
+
+            'nb_bleu_below_0.7': sum(1 if d < 0.7 else 0 for d in bleu_matched),
+            'avg-matched_nb_bleu_below_0.7': sum(1 if d < 0.7 else 0 for d in bleu_matched) / sum(_matched),
 
             'total': total,
         }
 
-    def save_simulation(self, matchs, scores):
+    def save_simulation(self, matchs):
+
         matched_file = os.path.join(self.folder, 'matched')
         not_matched_file = os.path.join(self.folder, 'not-matched')
 
         with open(matched_file, 'w') as fp_matched, open(not_matched_file, 'w') as fp_not_matched:
             for i, m in enumerate(matchs):
-                if len(m) == 5:
-                    direction, test_src, test_src_pre, test_src_map, test_tgt = m
-                    fp_not_matched.write("{},{}#{}:[{}|{}->(nb:{})]|{}\n".format(
+                if len(m) == 3:
+                    test_src, test_tgt, direction = m
+                    fp_not_matched.write("{},{}#{}:[{}->(nb:{})]|{}\n".format(
                         i,
                         direction,
-                        test_src,
-                        test_src_pre,
-                        json.dumps(test_src_map),
+                        test_src.source,
+                        test_src.key,
                         0,
-                        test_tgt
+                        test_tgt.source
                     ))
                 else:
-                    direction, test_src, test_src_pre, test_src_map, test_tgt, nb_matched, \
-                               match_post, match_pre, match_pre_map = m
+                    test_src, test_tgt, direction, nb_matched, matched, matched_rendered = m
 
-                    fp_matched.write("{},{}#{}:[{}|{}->(nb:{}){}:{}]|{}\n".format(
+                    fp_matched.write("{},{}#{}:[{}->(nb:{}){}:{}]|{}\n".format(
                         i,
                         direction,
-                        test_src,
-                        test_src_pre,
-                        json.dumps(test_src_map),
+                        test_src.source,
+                        test_src.key,
                         nb_matched,
-                        match_pre,
-                        match_post,
-                        test_tgt
+                        matched.key,
+                        matched_rendered,
+                        test_tgt.source
                     ))
+
+        scores = self.compute_scores(matchs)
 
         score_file = os.path.join(self.folder, 'scores')
         with open(score_file, 'w') as fp:
@@ -129,4 +130,7 @@ class Simulator:
 
 
 
+if __name__ == '__main__':
+    from backend import MySQLBackend
 
+    b = MySQLBackend({'host': '127.0.0.1', 'port': 3306, 'database': 'dfafa'})

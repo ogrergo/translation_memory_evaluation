@@ -1,18 +1,18 @@
 
 
 class Backend:
-    def __init__(self, params):
-        self.params = params
+    def __init__(self, paramaters):
+        self.parameters = paramaters
 
     @property
     def name(self):
         return self.__class__.__name__.lower()
 
-    def find(self, text, lang):
+    def find(self, sentence):
         pass
 
-    def add(self, text_src, mapping_src, text_tgt, mapping_tgt, direction, id):
+    def add(self, sentence_src, sentence_tgt):
         pass
 
-    def load(self, dataset, operator):
+    def load(self, dataset):
         pass

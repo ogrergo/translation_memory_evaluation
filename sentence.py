@@ -26,8 +26,9 @@ class Sentence:
         res = self.key
         
         assert len(self._transforms) == len(sentence._transforms)
-        from operators.operator import Operator
 
+        from operators.operator import Operator
+        
         for t, t_map in zip(reversed(self._transforms), reversed(sentence._transforms)):
             assert t['operator'] == t_map['operator'] and t['parameters'] == t_map['parameters']
             

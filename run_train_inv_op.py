@@ -14,7 +14,12 @@ OUT_SENTS = os.path.join(EXPERIMENT_FOLDER, 'portage-clean.WattTokenize.RemovePu
 IN_TEST = os.path.join(CACHE_ROOT, 'sftp-test-clean.WattTokenize.RemovePunct.RemoveSpaces.')
 OUT_TEST = os.path.join(EXPERIMENT_FOLDER, 'sftp-test-clean.WattTokenize.RemovePunct.RemoveSpaces.')
 
+IN_TRANSLATIONS = os.path.join(DATA_ROOT, 'portage-clean.WattTokenize.')
+OUT_TRANSLATIONS = os.path.join(EXPERIMENT_FOLDER, 'portage-clean.WattTokenize.')
 
+
+IN_TRANSLATIONS_TEST = os.path.join(DATA_ROOT, 'sftp-test-clean.WattTokenize.')
+OUT_TRANSLATIONS_TEST = os.path.join(EXPERIMENT_FOLDER, 'sftp-test-clean.WattTokenize.')
 
 
 if __name__ == '__main__':

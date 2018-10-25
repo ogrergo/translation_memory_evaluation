@@ -26,7 +26,7 @@ def runnable(f):
             name = "thread{} {}".format(i, args['run_name'])
             del args['run_name']
 
-            print("\n#########################################\n## {}: {}\n#########################################".format(f.__name__, name))
+            print("{}: {}".format(f.__name__, name).capitalize(), file=sys.stderr)
 
             try:
                 f(args)
@@ -75,6 +75,8 @@ if __name__ == '__main__':
     OPERATORS = [
         [],
         # [WattTokenize()],
+        [WattSerialize(), LowerCase()],
+
         [WattSerialize()],
 
         [RemovePunct()],
@@ -82,10 +84,9 @@ if __name__ == '__main__':
         [LowerCase()],
         [RemoveDiacritic()],
 
-        [RemoveSpaces(), RemovePunct(), LowerCase(), RemoveDiacritic()],
-
-        [RemoveSpaces(), RemovePunct(), LowerCase(), RemoveDiacritic(), WattSerialize()]
-        # [MosesTokenize()],
+        # [RemoveSpaces(), RemovePunct(), LowerCase(), RemoveDiacritic()],
+        #
+        # # [WattSerialize(), RemoveSpaces(), RemovePunct(), LowerCase(), RemoveDiacritic()]
         #[MosesTokenize(), WattTokenize()],
         #[WattTokenize(), MosesTokenize()],
     ]
@@ -97,10 +98,10 @@ if __name__ == '__main__':
 
     DATASETS_NAME = [
                     # 'sftp-clean.WattTokenize',
-
+        #
         'empty.WattTokenize',
         'sftp-test-clean.WattTokenize',
-
+        'watt-clean.WattTokenize',
         'portage-clean.WattTokenize',
                      ]
     # CACHE_ROOT = '/data/rali6/Tmp/vanbeurl/meteo-data/TM_cache'

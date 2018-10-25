@@ -8,7 +8,7 @@ def oracle(matched_many, target):
 
 
 def random(matched_many, target):
-    return rd.randint(0, len(matched_many))
+    return rd.randint(0, len(matched_many) - 1)
 
 
 def lastseen(matched_many, target):

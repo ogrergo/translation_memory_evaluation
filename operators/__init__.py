@@ -5,3 +5,5 @@ from .watt_serialize import WattSerialize
 from .moses_tokenize import MosesTokenize
 from .remove_spaces import RemoveSpaces
 from .remove_punct import RemovePunct
+from .remove_diacritics import RemoveDiacritic
+from .lowercase import LowerCase

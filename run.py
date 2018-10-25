@@ -10,6 +10,7 @@ from backend import MySQLBackend
 from dataset import Dataset
 from multimatch import oracle, random, mostseen
 from operators import *
+from operators import RemoveSpaces
 from simulator import Simulator
 from queue import Empty
 
@@ -72,32 +73,45 @@ def get_dataset_args(name, operators):
 
 if __name__ == '__main__':
     OPERATORS = [
-        [WattTokenize()],
-        [WattTokenize(), WattSerialize()],
+        [],
+        # [WattTokenize()],
+        [WattSerialize()],
+
         [RemovePunct()],
         [RemoveSpaces()],
-        [RemovePunct(), RemoveSpaces()],
-        #[MosesTokenize()],
+        [LowerCase()],
+        [RemoveDiacritic()],
+
+        [RemoveSpaces(), RemovePunct(), LowerCase(), RemoveDiacritic()],
+
+        [RemoveSpaces(), RemovePunct(), LowerCase(), RemoveDiacritic(), WattSerialize()]
+        # [MosesTokenize()],
         #[MosesTokenize(), WattTokenize()],
         #[WattTokenize(), MosesTokenize()],
     ]
 
     DATA_ROOT = '/data/rali6/Tmp/vanbeurl/meteo-data'
-    CACHE_ROOT = '/part/01/Tmp/experiments-meteo/TM_cache'
+    CACHE_ROOT = '/part/02/Tmp/experiments-meteo/TM_cache'
     # EXPERIMENT_FOLDER = '/data/rali6/Tmp/vanbeurl/meteo-data/TM_simulation/'
-    EXPERIMENT_FOLDER = '/part/01/Tmp/experiments-meteo/TM_experiments'
+    EXPERIMENT_FOLDER = '/part/02/Tmp/experiments-meteo/TM_experiments'
 
-    DATASETS_NAME = [ 'sftp-clean','portage-clean',
-                     'sftp-test-clean', 'empty']
+    DATASETS_NAME = [
+                    # 'sftp-clean.WattTokenize',
+
+        'empty.WattTokenize',
+        'sftp-test-clean.WattTokenize',
+
+        'portage-clean.WattTokenize',
+                     ]
     # CACHE_ROOT = '/data/rali6/Tmp/vanbeurl/meteo-data/TM_cache'
     def _dt_name(init, operators):
         return "{}_{}".format(init, "+".join(op.name for op in operators))
 
     DATASETS_ARGS = [{'run_name': _dt_name(name, operators), **get_dataset_args(name, operators)} for name, operators in product(DATASETS_NAME, OPERATORS)]
 
-    # run_pool(build_dataset_cache, DATASETS_ARGS, 20)
+    run_pool(build_dataset_cache, DATASETS_ARGS, 20)
 
-    MULTIMATCHERS = [oracle]#, random, mostseen]
+    MULTIMATCHERS = [oracle, random, mostseen]
 
     def _name(init, operators, multimatcher):
         return "{}_{}_{}".format(init, "+".join(op.name for op in operators), multimatcher.__name__)
@@ -108,7 +122,7 @@ if __name__ == '__main__':
             'backend': MySQLBackend({'host': '127.0.0.1', 'port': 3306, 'database': _name(init, operators, multimatcher)}),
             'multimatcher': multimatcher,
             'dataset_init': Dataset(**get_dataset_args(init, operators)),
-            'dataset_test': Dataset(**get_dataset_args('sftp-test-clean', operators))
+            'dataset_test': Dataset(**get_dataset_args('sftp-test-clean.WattTokenize', operators))
         } for multimatcher,
               init,
               operators in product(
@@ -117,5 +131,9 @@ if __name__ == '__main__':
                 OPERATORS
     )]
 
-    # Simulator(**EXPERIMENT_0[0]).run()
-    run_pool(run_experiments, EXPERIMENT_0, 8)
+    for e in EXPERIMENT_0:
+        print("#Running {}".format(e['run_name']))
+        del e['run_name']
+
+        Simulator(**e).run()
+    # run_pool(run_experiments, EXPERIMENT_0, 1)

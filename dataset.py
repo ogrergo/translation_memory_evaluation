@@ -44,7 +44,7 @@ class Dataset:
             return
 
         with open(self.cache_fr, 'w') as fp_fr, open(self.cache_en, 'w') as fp_en:
-            for fr, en in tqdm(self.iter_operators(), "Building cache for {}...".format(self.name)):
+            for fr, en in tqdm(self.iter_operators(apply_direction=False), "Building cache for {}...".format(self.name)):
                 fp_fr.write("{}\n".format(fr.serialize()))
                 fp_en.write("{}\n".format(en.serialize())) 
                 
@@ -59,21 +59,27 @@ class Dataset:
                
                 yield fr, en
 
-    def iter_operators(self):
+    def iter_operators(self, apply_direction=True):
         if not self.cache_exists:
             for fr, en in self:
                 self._apply_operators(fr)
                 self._apply_operators(en)
-                
-                yield self._apply_direction(fr, en)
+
+                if apply_direction:
+                    yield self._apply_direction(fr, en)
+                else:
+                    yield fr, en
         else:
             with open(self.cache_fr) as fp_fr, open(self.cache_en) as fp_en:
                 for fr_l, en_l in zip(fp_fr, fp_en):
                     fr = Sentence.deserialize(fr_l)
                     en = Sentence.deserialize(en_l)
 
-                    yield self._apply_direction(fr, en)
-                
+                    if apply_direction:
+                        yield self._apply_direction(fr, en)
+                    else:
+                        yield fr, en
+
     def _apply_direction(self, line_fr, line_en):
         direction = self.direction
         if direction == 'random':

@@ -11,21 +11,27 @@ class Simulator:
         self.folder = exp_path
         self.name = os.path.basename(exp_path)
 
-        if os.path.exists(self.folder):
-            shutil.rmtree(self.folder)
-        os.makedirs(self.folder)
+        if not self.done:
+            if os.path.exists(self.folder):
+                shutil.rmtree(self.folder)
+            os.makedirs(self.folder)
 
         self.backend = backend
         self.multimatcher = multimatcher
         self.dataset_init = dataset_init
         self.dataset_test = dataset_test
 
+    @property
+    def done(self):
+        return os.path.exists(os.path.join(self.folder, 'scores'))
+
     def run(self):
-        self.backend.load(self.dataset_init)
+        if not self.done:
+            self.backend.load(self.dataset_init)
 
-        matchs = self._pass_test_set()
+            matchs = self._pass_test_set()
 
-        self.save_simulation(matchs)
+            self.save_simulation(matchs)
 
     def _pass_test_set(self):
         matchs = []
@@ -126,8 +132,6 @@ class Simulator:
         score_file = os.path.join(self.folder, 'scores')
         with open(score_file, 'w') as fp:
             json.dump(scores, fp=fp, indent=True)
-
-
 
 
 if __name__ == '__main__':

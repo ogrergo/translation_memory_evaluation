@@ -21,18 +21,27 @@ class MySQLBackend(SQLBackend):
         self._clear_tables()
 
         with self.connection.cursor() as c:
+            print("Loading translations units ...")
             c.execute("""LOAD DATA INFILE %s INTO TABLE translations_units 
-            FIELDS TERMINATED BY '$$'
-            LINES TERMINATED BY '\n'
-            (id, language, text, text_hash, mapping)
-            """, tu_file)
-            c.execute("""LOAD DATA INFILE %s INTO TABLE translations 
-                        FIELDS TERMINATED BY '$$'
-                        LINES TERMINATED BY '\n'
-                        (id, id_fr, id_en)
-                        """, rel_file)
+                FIELDS TERMINATED BY '$$'
+                LINES TERMINATED BY '\n'
+                (id, language, text, text_hash, mapping)
+                """, tu_file)
 
+            print("Loading translations relations ...")
+            c.execute("""LOAD DATA INFILE %s INTO TABLE translations 
+                FIELDS TERMINATED BY '$$'
+                LINES TERMINATED BY '\n'
+                (id, id_fr, id_en)
+                """, rel_file)
+
+            # c.execute("""ALTER TABLE translations_units CHANGE id id INTEGER AUTO_INCREMENT""")
+            # c.execute("""ALTER TABLE translations CHANGE id id INTEGER AUTO_INCREMENT""")
         self.connection.commit()
+
+        os.remove(tu_file)
+        os.remove(rel_file)
+
 
     def _open_connection(self):
         connection = pymysql.connect(host=self.parameters['host'],
@@ -46,7 +55,7 @@ class MySQLBackend(SQLBackend):
 
             for r in cursor.fetchall():
                 if r['Database'] == name:
-                    print(cursor.execute('DROP DATABASE `{}`'.format(name)))
+                    cursor.execute('DROP DATABASE `{}`'.format(name))
 
             cursor.execute('CREATE DATABASE `{}`'.format(name))
             cursor.execute('USE `{}`'.format(name))
@@ -57,8 +66,8 @@ class MySQLBackend(SQLBackend):
 
     @staticmethod
     def write_data_infile(dataset):
-        tu = defaultdict(iter(count()).__next__)
-        rel = defaultdict(iter(count()).__next__)
+        tu = defaultdict(iter(count(start=1)).__next__)
+        rel = defaultdict(iter(count(start=1)).__next__)
 
         osfp_tu, data_infile_tu = mkstemp()
         osfp_rel, data_infile_rel = mkstemp()

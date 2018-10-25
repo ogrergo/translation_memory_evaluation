@@ -50,16 +50,8 @@ class SQLBackend(Backend):
 
     def _do_add(self, cursor, sentence_src, sentence_tgt):
         assert sentence_src.language != sentence_tgt.language
-
-        cursor.execute("INSERT IGNORE INTO translations_units(language, text, text_hash, mapping) VALUES({},{},{},{}) ".format(self.C, self.C, self.C, self.C,),
-                  (sentence_src.language, sentence_src.key, self.hash(sentence_src.key), Sentence.serialize(sentence_src)))
-
-        src_id = cursor.lastrowid
-
-        cursor.execute("INSERT IGNORE INTO translations_units(language, text, text_hash, mapping) VALUES({},{},{},{}) ".format(self.C, self.C, self.C, self.C),
-                  (sentence_tgt.language, sentence_tgt.key, self.hash(sentence_src.key), Sentence.serialize(sentence_tgt)))
-
-        tgt_id = cursor.lastrowid
+        src_id = self._add_to_translation_units(cursor, sentence_src.language, sentence_src.key, Sentence.serialize(sentence_src))
+        tgt_id = self._add_to_translation_units(cursor, sentence_tgt.language, sentence_tgt.key, Sentence.serialize(sentence_tgt))
 
         if sentence_src.language == 'fr':
             id_fr = src_id
@@ -68,8 +60,29 @@ class SQLBackend(Backend):
             id_fr = tgt_id
             id_en = src_id
 
-        cursor.execute("INSERT IGNORE INTO translations(id_fr, id_en) VALUES({},{}) ".format(self.C, self.C,),
-                  (id_fr, id_en))
+        cursor.execute(
+            "SELECT id FROM translations WHERE id_fr={} AND id_en={}".format(self.C, self.C),
+            (id_fr, id_en))
+
+        rel_id = cursor.fetchone()
+        if not rel_id:
+            cursor.execute("INSERT INTO translations(id_fr, id_en) VALUES({},{}) ".format(self.C, self.C,),
+                      (id_fr, id_en))
+
+    def _add_to_translation_units(self, cursor, language, key, mapping):
+        cursor.execute("SELECT id FROM translations_units WHERE language={} AND text_hash={}".format(self.C, self.C),
+                       (language, self.hash(key)))
+        src_id = cursor.fetchone()
+        if not src_id:
+            cursor.execute("INSERT INTO translations_units(language, text, text_hash, mapping) VALUES({},{},{},{}) ".format(self.C, self.C, self.C, self.C,),
+                      (language, key, self.hash(key), mapping))
+            cursor.execute(
+                "SELECT id FROM translations_units WHERE language={} AND text_hash={}".format(self.C, self.C),
+                (language, self.hash(key)))
+            src_id = cursor.fetchone()
+
+        return src_id['id']
+
 
     def _open_connection(self):
         return sqlite3.connect(os.path.join(self.parameters['folder'], 'TM.db'))
@@ -80,7 +93,7 @@ class SQLBackend(Backend):
             c.execute("DROP TABLE IF EXISTS translations_units")
 
             c.execute('''CREATE TABLE translations_units (
-                id        INTEGER PRIMARY KEY , 
+                id        INTEGER PRIMARY KEY AUTO_INCREMENT, 
                 language  CHAR(2) NOT NULL,
                 text_hash CHAR(64) NOT NULL,
                 text      TEXT NOT NULL, 
@@ -90,7 +103,7 @@ class SQLBackend(Backend):
             c.execute("CREATE UNIQUE INDEX index_translations_units ON translations_units (language, text_hash);")
 
             c.execute('''CREATE TABLE translations (
-                id      INTEGER PRIMARY KEY , 
+                id      INTEGER PRIMARY KEY AUTO_INCREMENT, 
 
                 id_fr   INTEGER NOT NULL,
                 id_en   INTEGER NOT NULL,

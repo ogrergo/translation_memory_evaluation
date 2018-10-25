@@ -474,11 +474,12 @@ assert len(_TRANSLATE_TOKEN_e2f) == len(_TRANSLATE_TOKEN_f2e)
 def _translate_token(token, value, direction):
     if direction == 'f2e':
         trans = _TRANSLATE_TOKEN_f2e
+        up_case = True
     else:
         trans = _TRANSLATE_TOKEN_e2f
+        up_case = False
 
     if token in {'__MONTH__', '__DAY__'}:
-        up_case = value[0].isupper()
         try:
             value = trans[value.lower()]
         except KeyError:
